@@ -43,7 +43,7 @@ impl Template for IncludeTemplate {
         return "include";
     }
 
-    fn parse(&mut self, s: &str) -> anyhow::Result<Box<dyn Template>> {
+    fn parse(&self, s: &str) -> anyhow::Result<Box<dyn Template>> {
         let captures = self
             .regex
             .captures(s)

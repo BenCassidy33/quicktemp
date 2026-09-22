@@ -2,7 +2,7 @@ use std::fmt::Debug;
 
 pub trait Template: Debug {
     fn descriminator(&self) -> &str;
-    fn parse(&mut self, s: &str) -> anyhow::Result<Box<dyn Template>>;
+    fn parse(&self, s: &str) -> anyhow::Result<Box<dyn Template>>;
     fn exec(&self) -> anyhow::Result<String>;
 }
 
@@ -21,10 +21,10 @@ impl TemplateParser {
         self.registered_templates.push(Box::new(template));
     }
 
-    pub fn parse(&mut self, s: &str) -> anyhow::Result<Box<dyn Template>> {
-        for temp in self.registered_templates.iter_mut() {
+    pub fn parse(&self, s: &str) -> anyhow::Result<Box<dyn Template>> {
+        for temp in &self.registered_templates {
             if s.starts_with(temp.descriminator())
-                && let Ok(t) = temp.as_mut().parse(s)
+                && let Ok(t) = temp.parse(s)
             {
                 return Ok(t);
             }
