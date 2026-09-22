@@ -1,1 +1,2 @@
-<div>{{ include ./src/main.rs, pretty = false }}</div>
+<div>{{ include ./src/main.rs :: pretty = true }}</div>
+<div>{{ exec print("<div>Hello World!</div>") :: language = python }}</div>

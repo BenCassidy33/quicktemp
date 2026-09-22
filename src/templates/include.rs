@@ -1,9 +1,12 @@
-use crate::{options::TemplateOptions, template::Template};
+use crate::{OPTIONS_DELIMITER, options::TemplateOptions, template::Template};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use std::{any, path::PathBuf};
+use std::{any, path::PathBuf, range::Range, sync::LazyLock};
 
-const REGEX: &str = r"^\s*(include)\s+([^,]+?)\s*(?:,\s*(.+))?\s*$";
+static REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    let pattern = format!(r"^\s*(include)\s+([^,]+?)\s*(?:{OPTIONS_DELIMITER}\s*(.+))?\s*$");
+    Regex::new(&pattern).expect("invalid regex pattern")
+});
 
 fn default_true() -> bool {
     true
@@ -23,7 +26,6 @@ impl TemplateOptions for IncludeOptions {}
 
 #[derive(Debug, Clone)]
 pub struct IncludeTemplate {
-    regex: Regex,
     paths: Vec<PathBuf>,
     opts: IncludeOptions,
 }
@@ -31,7 +33,6 @@ pub struct IncludeTemplate {
 impl IncludeTemplate {
     pub fn new() -> Self {
         IncludeTemplate {
-            regex: Regex::new(REGEX).expect("Failed to parse regex for include!"),
             paths: Vec::new(),
             opts: IncludeOptions::default(),
         }
@@ -44,8 +45,7 @@ impl Template for IncludeTemplate {
     }
 
     fn parse(&self, s: &str) -> anyhow::Result<Box<dyn Template>> {
-        let captures = self
-            .regex
+        let captures = REGEX
             .captures(s)
             .ok_or(anyhow::anyhow!("Invalid include template structure"))?;
 
@@ -59,7 +59,7 @@ impl Template for IncludeTemplate {
             .unwrap();
 
         let paths = paths.as_str().split(" ").collect::<Vec<&str>>();
-        let paths = paths.iter().map(|p| PathBuf::from(p));
+        let paths = paths.iter().map(PathBuf::from);
 
         let opts = if let Some(opts) = captures.next() {
             let opts = opts.unwrap().as_str();
@@ -69,7 +69,6 @@ impl Template for IncludeTemplate {
         };
 
         Ok(Box::new(Self {
-            regex: Regex::new("(include)\\s+(.+)").unwrap(),
             paths: paths.collect(),
             opts,
         }))

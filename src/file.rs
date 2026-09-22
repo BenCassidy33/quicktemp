@@ -1,13 +1,11 @@
-use std::{
-    fs::File,
-    io::{BufRead, BufReader, Read},
-    path::{Path, PathBuf},
-};
-
 use crate::template::{Template, TemplateParser};
 use regex::Regex;
+use std::{path::PathBuf, sync::LazyLock};
 
-const REGEX: &str = r"\{\{(.*?)\}\}";
+static REGEX: LazyLock<Regex> = LazyLock::new(|| {
+    let pattern = r"\{\{(.*?)\}\}";
+    Regex::new(pattern).expect("invalid regex pattern")
+});
 
 pub struct TemplateFile {
     path: PathBuf,
@@ -19,29 +17,20 @@ pub struct TemplateFile {
 // TODO: Make this lazy so the entire file is not read at runtime...
 impl TemplateFile {
     pub fn new<P: Into<PathBuf>>(path: P) -> anyhow::Result<Self> {
-        let regex = Regex::new(REGEX).expect("Failed to parse regex");
-
         let path = path.into();
         let content = std::fs::read_to_string(&path)?;
-        let captures = regex.captures(&content);
-
-        if captures.is_none() {
-            return Ok(Self {
-                path,
-                content,
-                raw_templates: Vec::new(),
-                templates: Vec::new(),
-            });
-        }
-
+        let captures = REGEX.captures_iter(&content);
         let mut raw_templates = Vec::new();
 
-        for (idx, cap) in captures.unwrap().iter().enumerate() {
-            if idx % 2 == 0 {
-                continue;
+        for cap in captures {
+            let cap_str = cap.get_match().as_str();
+            if !cap_str.starts_with("{{") || !cap_str.ends_with("}}") {
+                return Err(anyhow::anyhow!(
+                    "Templates must start with `{{` and end with `}}`."
+                ));
             }
 
-            raw_templates.push(cap.unwrap().as_str().trim().to_string());
+            raw_templates.push(cap_str[2..cap_str.len() - 3].trim().to_string());
         }
 
         Ok(Self {
