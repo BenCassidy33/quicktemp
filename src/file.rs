@@ -1,4 +1,7 @@
-use crate::template::{Template, TemplateParser};
+use crate::{
+    preprocessor,
+    template::{Template, TemplateInfo, TemplateParser},
+};
 use regex::Regex;
 use std::{path::PathBuf, sync::LazyLock};
 
@@ -7,10 +10,11 @@ static REGEX: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(pattern).expect("invalid regex pattern")
 });
 
+#[derive(Debug)]
 pub struct TemplateFile {
     path: PathBuf,
     content: String,
-    raw_templates: Vec<String>,
+    raw_templates: Vec<(String, TemplateInfo)>,
     templates: Vec<Box<dyn Template>>,
 }
 
@@ -18,7 +22,7 @@ pub struct TemplateFile {
 impl TemplateFile {
     pub fn new<P: Into<PathBuf>>(path: P) -> anyhow::Result<Self> {
         let path = path.into();
-        let content = std::fs::read_to_string(&path)?;
+        let content = preprocessor::preprocess(std::fs::read_to_string(&path)?);
         let captures = REGEX.captures_iter(&content);
         let mut raw_templates = Vec::new();
 
@@ -30,7 +34,9 @@ impl TemplateFile {
                 ));
             }
 
-            raw_templates.push(cap_str[2..cap_str.len() - 3].trim().to_string());
+            let raw_template = cap_str[2..cap_str.len() - 3].trim().to_string();
+            let info = TemplateInfo::get_info_from_file(&raw_template, &content, &path);
+            raw_templates.push((raw_template, info));
         }
 
         Ok(Self {
@@ -44,20 +50,34 @@ impl TemplateFile {
     pub fn parse_templates(
         &mut self,
         parser: &TemplateParser,
-    ) -> anyhow::Result<&Vec<Box<dyn Template>>> {
-        for template in &self.raw_templates {
-            let temp = parser.parse(template)?;
+    // ) -> anyhow::Result<&Vec<Box<dyn Template>>> {
+    ) -> anyhow::Result<()> {
+        for (raw, info) in &self.raw_templates {
+            let temp = parser.parse(raw, info.clone())?;
             self.templates.push(temp);
         }
 
-        Ok(&self.templates)
+        Ok(())
     }
 
-    pub fn raw_templates(&self) -> &Vec<String> {
+    pub fn raw_templates(&self) -> &Vec<(String, TemplateInfo)> {
         &self.raw_templates
     }
 
     pub fn templates(&self) -> &Vec<Box<dyn Template>> {
         &self.templates
+    }
+
+    pub fn get_raw(&self, template: &Box<dyn Template>) -> String {
+        let info = template.info();
+        info.get_raw_from_file(&self.content)
+    }
+}
+
+impl TryInto<TemplateFile> for PathBuf {
+    type Error = anyhow::Error;
+
+    fn try_into(self) -> Result<TemplateFile, Self::Error> {
+        TemplateFile::new(self)
     }
 }

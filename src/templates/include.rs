@@ -1,12 +1,13 @@
-use crate::{OPTIONS_DELIMITER, options::TemplateOptions, template::Template};
+use crate::{
+    OPTIONS_DELIMITER,
+    options::TemplateOptions,
+    template::{Template, TemplateInfo},
+};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{any, path::PathBuf, range::Range, sync::LazyLock};
 
-static REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    let pattern = format!(r"^\s*(include)\s+([^,]+?)\s*(?:{OPTIONS_DELIMITER}\s*(.+))?\s*$");
-    Regex::new(&pattern).expect("invalid regex pattern")
-});
+crate::regex!(REGEX, r"^\s*(include)\s+([^,]+?)\s*(?:{OPTIONS_DELIMITER}\s*(.+))?\s*$");
 
 fn default_true() -> bool {
     true
@@ -28,6 +29,7 @@ impl TemplateOptions for IncludeOptions {}
 pub struct IncludeTemplate {
     paths: Vec<PathBuf>,
     opts: IncludeOptions,
+    info: TemplateInfo,
 }
 
 impl IncludeTemplate {
@@ -35,16 +37,21 @@ impl IncludeTemplate {
         IncludeTemplate {
             paths: Vec::new(),
             opts: IncludeOptions::default(),
+            info: TemplateInfo::default(),
         }
     }
 }
 
 impl Template for IncludeTemplate {
+    fn info(&self) -> &TemplateInfo {
+        &self.info
+    }
+
     fn descriminator(&self) -> &str {
         return "include";
     }
 
-    fn parse(&self, s: &str) -> anyhow::Result<Box<dyn Template>> {
+    fn parse(&self, s: &str, info: TemplateInfo) -> anyhow::Result<Box<dyn Template>> {
         let captures = REGEX
             .captures(s)
             .ok_or(anyhow::anyhow!("Invalid include template structure"))?;
@@ -71,6 +78,7 @@ impl Template for IncludeTemplate {
         Ok(Box::new(Self {
             paths: paths.collect(),
             opts,
+            info,
         }))
     }
 

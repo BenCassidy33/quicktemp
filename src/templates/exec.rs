@@ -1,12 +1,16 @@
-use std::{path::PathBuf, str::FromStr, sync::LazyLock};
+use std::{any, path::PathBuf, str::FromStr, sync::LazyLock};
 
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::{options::TemplateOptions, template::Template};
+use crate::{
+    OPTIONS_DELIMITER,
+    options::TemplateOptions,
+    template::{Template, TemplateInfo},
+};
 
 static REGEX: LazyLock<Regex> = LazyLock::new(|| {
-    let pattern = format!(r"^\s*(exec)\s+([^,]+?)\s*(?:::\s*(.+))?\s*$");
+    let pattern = format!(r"^\s*(exec)\s+(.+?)\s*(?:{OPTIONS_DELIMITER}\s*(.+))?\s*$");
     Regex::new(&pattern).expect("invalid regex pattern")
 });
 
@@ -47,12 +51,17 @@ impl ExecLanguage {
             ExecLanguage::Python => PathBuf::from("/usr/bin/python"),
         }
     }
+
+    pub fn exec(code: &str) -> anyhow::Result<()> {
+        todo!()
+    }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ExecOptions {
     language: String,
     binary: String,
+    args: String,
 }
 
 impl Default for ExecOptions {
@@ -60,6 +69,7 @@ impl Default for ExecOptions {
         Self {
             language: "python".to_string(),
             binary: "/usr/bin/python3".to_string(),
+            args: String::new(),
         }
     }
 }
@@ -71,6 +81,7 @@ pub struct ExecTemplate {
     code: String,
     options: ExecOptions,
     args: Vec<String>,
+    info: TemplateInfo,
 }
 
 impl ExecTemplate {
@@ -79,7 +90,39 @@ impl ExecTemplate {
             code: String::new(),
             options: ExecOptions::default(),
             args: Vec::new(),
+            info: TemplateInfo::default(),
         }
+    }
+
+    fn exec_via_stdin(binary: &PathBuf, code: &str) -> anyhow::Result<String> {
+        todo!()
+    }
+
+    fn exec_via_tempfs(binary: &PathBuf, code: &str) -> anyhow::Result<String> {
+        todo!()
+    }
+
+    pub fn parse_args(&self) -> anyhow::Result<Vec<&str>> {
+        let mut args = Vec::new();
+
+        for arg in self.options.args.split(";") {
+            if let Some(arg_stripped) = arg.strip_prefix("$") {
+                if let Some(arg) = self.get_arg(arg_stripped) {
+                    args.push(arg);
+                    continue;
+                } else {
+                    return Err(anyhow::anyhow!("Unknown argument `{arg}`"));
+                }
+            }
+
+            args.push(arg);
+        }
+
+        Ok(args)
+    }
+
+    pub fn get_arg(&self, arg: &str) -> Option<&str> {
+        todo!()
     }
 }
 
@@ -88,7 +131,7 @@ impl Template for ExecTemplate {
         "exec"
     }
 
-    fn parse(&self, s: &str) -> anyhow::Result<Box<dyn Template>> {
+    fn parse(&self, s: &str, info: TemplateInfo) -> anyhow::Result<Box<dyn Template>> {
         let captures = REGEX
             .captures(s)
             .ok_or(anyhow::anyhow!("Invalid exec template structure"))?;
@@ -115,7 +158,12 @@ impl Template for ExecTemplate {
             code,
             options: opts,
             args: Vec::new(),
+            info
         }))
+    }
+
+    fn info(&self) -> &TemplateInfo {
+        &self.info
     }
 
     fn exec(&self) -> anyhow::Result<String> {
