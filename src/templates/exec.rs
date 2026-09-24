@@ -3,11 +3,7 @@ use std::{any, path::PathBuf, str::FromStr, sync::LazyLock};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    OPTIONS_DELIMITER,
-    options::TemplateOptions,
-    template::{Template, TemplateInfo},
-};
+use crate::{OPTIONS_DELIMITER, Template, info::TemplateInfo, options::TemplateOptions};
 
 static REGEX: LazyLock<Regex> = LazyLock::new(|| {
     let pattern = format!(r"^\s*(exec)\s+(.+?)\s*(?:{OPTIONS_DELIMITER}\s*(.+))?\s*$");
@@ -131,10 +127,10 @@ impl Template for ExecTemplate {
         "exec"
     }
 
-    fn parse(&self, s: &str, info: TemplateInfo) -> anyhow::Result<Box<dyn Template>> {
-        let captures = REGEX
-            .captures(s)
-            .ok_or(anyhow::anyhow!("Invalid exec template structure"))?;
+    fn parse(&self, s: &str, info: TemplateInfo) -> anyhow::Result<Option<Box<dyn Template>>> {
+        let Some(captures) = REGEX.captures(s) else {
+            return Ok(None);
+        };
 
         let mut captures = captures.iter();
         captures.next();
@@ -154,12 +150,12 @@ impl Template for ExecTemplate {
             ExecOptions::default()
         };
 
-        Ok(Box::new(Self {
+        Ok(Some(Box::new(Self {
             code,
             options: opts,
             args: Vec::new(),
-            info
-        }))
+            info,
+        })))
     }
 
     fn info(&self) -> &TemplateInfo {

@@ -1,7 +1,4 @@
-use crate::{
-    preprocessor,
-    template::{Template, TemplateInfo, TemplateParser},
-};
+use crate::{Template, TemplateItem, info::TemplateInfo, parser::TemplateParser, preprocessor};
 use regex::Regex;
 use std::{path::PathBuf, sync::LazyLock};
 
@@ -47,19 +44,6 @@ impl TemplateFile {
         })
     }
 
-    pub fn parse_templates(
-        &mut self,
-        parser: &TemplateParser,
-    // ) -> anyhow::Result<&Vec<Box<dyn Template>>> {
-    ) -> anyhow::Result<()> {
-        for (raw, info) in &self.raw_templates {
-            let temp = parser.parse(raw, info.clone())?;
-            self.templates.push(temp);
-        }
-
-        Ok(())
-    }
-
     pub fn raw_templates(&self) -> &Vec<(String, TemplateInfo)> {
         &self.raw_templates
     }
@@ -79,5 +63,21 @@ impl TryInto<TemplateFile> for PathBuf {
 
     fn try_into(self) -> Result<TemplateFile, Self::Error> {
         TemplateFile::new(self)
+    }
+}
+
+impl TemplateItem for TemplateFile {
+    fn parse_template(
+        &mut self,
+        parser: &TemplateParser,
+        template: &Box<dyn Template>,
+    ) -> anyhow::Result<()> {
+        for (raw, info) in &self.raw_templates {
+            if let Some(temp) = template.parse(raw, info.clone())? {
+                self.templates.push(temp);
+            }
+        }
+
+        Ok(())
     }
 }

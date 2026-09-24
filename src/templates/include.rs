@@ -1,13 +1,13 @@
-use crate::{
-    OPTIONS_DELIMITER,
-    options::TemplateOptions,
-    template::{Template, TemplateInfo},
-};
+use crate::{OPTIONS_DELIMITER, Template, info::TemplateInfo, options::TemplateOptions};
+
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::{any, path::PathBuf, range::Range, sync::LazyLock};
 
-crate::regex!(REGEX, r"^\s*(include)\s+([^,]+?)\s*(?:{OPTIONS_DELIMITER}\s*(.+))?\s*$");
+crate::regex!(
+    REGEX,
+    r"^\s*(include)\s+([^,]+?)\s*(?:{OPTIONS_DELIMITER}\s*(.+))?\s*$"
+);
 
 fn default_true() -> bool {
     true
@@ -51,10 +51,10 @@ impl Template for IncludeTemplate {
         return "include";
     }
 
-    fn parse(&self, s: &str, info: TemplateInfo) -> anyhow::Result<Box<dyn Template>> {
-        let captures = REGEX
-            .captures(s)
-            .ok_or(anyhow::anyhow!("Invalid include template structure"))?;
+    fn parse(&self, s: &str, info: TemplateInfo) -> anyhow::Result<Option<Box<dyn Template>>> {
+        let Some(captures) = REGEX.captures(s) else {
+            return Ok(None);
+        };
 
         let mut captures = captures.iter();
 
@@ -75,11 +75,11 @@ impl Template for IncludeTemplate {
             IncludeOptions::default()
         };
 
-        Ok(Box::new(Self {
+        Ok(Some(Box::new(Self {
             paths: paths.collect(),
             opts,
             info,
-        }))
+        })))
     }
 
     fn exec(&self) -> anyhow::Result<String> {

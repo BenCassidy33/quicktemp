@@ -6,11 +6,5 @@
 }}
 </div>
 <div>
-{{ 
-    exec print("<div>Hello World!</div>") 
-    :: 
-    language = python,
-    binary = /usr/bin/python3,
-    args = $file; $line; $col 
-}}
+{{ exec print("<div>Hello World!</div>") :: language = python, binary = /usr/bin/python3 }}
 </div>
